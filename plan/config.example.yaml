@@ -1,0 +1,59 @@
+# Copy to config.yaml and edit paths. All thresholds are starting values to tune in S7.
+paths:
+  tracking_txt: data/raw/BAR-ATH_broadcast_atd.txt
+  tracking_xml: data/raw/BAR-ATH_broadcast_atd.xml
+  homography_csv: data/raw/BAR-ATH_broadcast_homography.csv
+  video: /path/to/BAR-ATH_broadcast.mp4      # keep out of git
+  interim: data/interim
+  reports: reports
+
+align:
+  frame_offset: null        # set in S2 (Q3)
+  homography_direction: null  # "pitch_to_image" or "image_to_pitch" (Q4)
+  homography_units: null      # "metres" or "normalised" (Q4)
+  max_reproj_err: 1.0
+
+control:
+  max_dist_m: 1.5
+  max_rel_speed_kmh: 8
+  min_frames: 6
+  max_gap_frames: 3
+  smooth_window: 7
+  knock_on_m: 5
+  knock_on_s: 1.0
+  crowd_n: 4
+
+seg:
+  min_kick_kmh: 15
+  pressure_dist_m: 1.5
+  min_straightness: 0.85
+  long_pass_m: 25
+  jump_m: 3
+  clearance_teammate_m: 10
+
+dead:
+  out_margin_m: 0.75
+  walk_kmh: 7
+  mass_share: 0.8
+  stationary_s: 3
+  min_signals: 2
+  min_s: 1.0
+
+possession:
+  loose_credit: last_team   # or "none"
+
+tackle:
+  contact_m: 1.0
+  min_closing_kmh: 5
+  window_s: 1.5
+  merge_s: 0.5
+
+# Added by docs/06_edge_cases.md
+ball:
+  max_kmh: 150
+player:
+  max_kmh: 37
+shot:
+  goal_margin_m: 2.0
+touch:
+  min_dir_change_deg: 30
