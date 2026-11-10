@@ -1,7 +1,7 @@
 # S4 — Uncontrolled segments: pass, long pass, loose ball
 
 ## Goal
-Cut every stretch between two control episodes into segments and classify each as `pass`, `long_pass` or `loose`, with an outcome (`complete`, `intercepted`, `out`, `stopped`). Rules in `03_definitions.md`.
+Cut every stretch between two control episodes into segments and classify each as `pass`, `long_pass` or `loose`, with an outcome (`complete`, `intercepted`, `out`, `stopped`). Rules in `03_definitions.md`. Segments are an internal signal for S5 and are not scored themselves.
 
 ## Input
 `control.parquet`, `tracking.npz`, `frames.parquet`.
@@ -26,7 +26,7 @@ else:
 ```
    then overwrite outcome with `out` / `stopped` when the segment ended that way.
 5. Clearance flag: kick under pressure, no teammate within `seg.clearance_teammate_m` of landing.
-6. (Later) optional scikit-learn classifier trained on labelled segments from S7, same features.
+6. (Later) optional scikit-learn classifier with the same features, trained only on labelled data from other matches.
 
 ## Config keys
 `seg.min_kick_kmh: 15`, `seg.pressure_dist_m: 1.5`, `seg.min_straightness: 0.85`, `seg.long_pass_m: 25`, `seg.jump_m: 3`, `seg.clearance_teammate_m: 10`.
@@ -38,7 +38,8 @@ else:
 - Low-speed zig-zag between two opponents → loose.
 
 ## Acceptance
-- Report: counts per kind/outcome per team (a typical match: ~800–1000 passes total, ~10–15% long); 30 random segments of each kind checked on video, precision ≥ 85% for passes before moving on.
+- Local report: counts per kind/outcome per team, checked for plausibility (a typical match: ~800–1000 passes total, ~10–15% long).
+- Measure precision only on labelled data from other matches, never by judging this match's video.
 
 ## Edge cases
 Before building, read `docs/06_edge_cases.md` and handle every case whose Stage column includes S4 (or log it as a known limitation in the report).

@@ -1,5 +1,7 @@
 # S8 (optional) — Ball speed from video only
 
+> **Deferred.** Not in the build order. Build it only if better ball detection raises `spellF1` on other matches, and only if the video stays local. Any hand-labelled training data must come from other matches.
+
 ## Goal
 Measure ball speed purely from the video with computer vision, and validate it against the Metrica ball speed. Independent of S1–S7 except for the homography.
 
@@ -26,7 +28,7 @@ v = np.hypot(np.diff(xs), np.diff(ys)) * 25 * 3.6
 - Occlusion: interpolate up to ~0.2 s only.
 
 ## Stack
-Ultralytics YOLO or TrackNet (PyTorch), SAHI, filterpy/Norfair, OpenCV, scipy, decord/PyAV, CVAT for labelling (YOLO export), SoccerNet + Roboflow football datasets plus frames from this broadcast, TensorRT/ONNX Runtime FP16 for inference. NVIDIA GPU required.
+Ultralytics YOLO or TrackNet (PyTorch), SAHI, filterpy/Norfair, OpenCV, scipy, decord/PyAV, CVAT for labelling other matches only (YOLO export), SoccerNet + Roboflow football datasets, TensorRT/ONNX Runtime FP16 for inference. NVIDIA GPU required.
 
 ## Validation
 Compare CV speed with Metrica `B[:,2]`: median absolute error overall and separately for ground passes, aerial balls (S4 `aerial_flag`), and shots. Detection recall per frame vs Metrica ball presence.

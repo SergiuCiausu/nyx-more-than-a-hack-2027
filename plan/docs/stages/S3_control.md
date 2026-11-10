@@ -10,13 +10,13 @@ For every frame, decide whether a player controls the ball, and which one.
 `data/interim/control.parquet`: `frame, nearest, dmin, ball_v, raw_ctrl, controlled, ctrl_track, ctrl_team`.
 
 ## Steps
-1. `dist (T,51)` = ball→player distance in metres; NaN → inf.
+1. `dist (T,N)` = ball→slot distance in metres; NaN → inf. Speeds must already be in km/h, converted in S1 after Q12.
 2. `nearest = argmin`, `dmin`, nearest player's speed.
 3. `ball_v` = ball speed smoothed with Savitzky–Golay (`control.smooth_window`, default 7 frames, order 2). Compare with the provided speed column; also compute speed from positions as a cross-check.
 4. `raw_ctrl = (dmin < control.max_dist_m) & (ball_v < near_speed + control.max_rel_speed_kmh)`.
 5. Hysteresis (sequential loop, numba optional): control switches to a new track only after `control.min_frames` consecutive frames; short drops (< `control.max_gap_frames`) don't end control.
 6. `ctrl_team = team[ctrl_track]`, −1 if none.
-7. Inspect 5 known long balls against video for aerial artefacts → Q10.
+7. Compare the speed field with speed computed from positions, and summarise spikes and jumps for aerial artefacts → Q10. Video may be used to debug, but what you see must not become labels, corrections or frame-specific rules.
 
 Reference implementation sketch:
 ```python
@@ -35,7 +35,7 @@ raw = (dmin < MAX_D) & (ball_v < near_speed + MAX_REL)
 
 ## Acceptance
 - Runs in < 30 s for the whole match.
-- Report: % frames controlled per team; histogram of control-episode lengths; 20 random control switches checked on video.
+- Local report: % frames controlled per team and a histogram of control-episode lengths.
 
 ## Edge cases
 Before building, read `docs/06_edge_cases.md` and handle every case whose Stage column includes S3 (or log it as a known limitation in the report).

@@ -5,15 +5,15 @@ These are football conventions the code must implement. Thresholds are starting 
 ## Team vs player possession
 - **Player control:** a player has the ball when they are the nearest player, within `control.max_dist_m` (1.5 m), the ball is not moving much faster than them (`ball_speed < player_speed + control.max_rel_speed_kmh`, 8 km/h), for at least `control.min_frames` (6 frames ≈ 0.25 s).
 - **Team possession:** a team keeps possession until the opponent gains control or the ball goes dead. Time in flight of a pass is credited to the **passer's team**, even if the pass fails (most common convention).
-- **Dead time** (ball out, stoppage, camera cut with no data) counts for nobody. Possession % is computed over ball-in-play time only.
-- **Loose-ball time:** configurable (`possession.loose_credit`: `none` or `last_team`). Default `last_team`.
+- **Dead time** (ball out, stoppage) is labelled `D` and counts for nobody.
+- **Loose-ball time:** always stays with the last team in possession, as the competition defines it.
 
 ## Ball states (one per frame)
 | Code | State | Possession credited to |
 |---|---|---|
 | 0 | `controlled` | controlling player's team |
 | 1 | `in_flight` | passer's team |
-| 2 | `loose` | per `loose_credit` |
+| 2 | `loose` | last team in possession |
 | 3 | `dead` | nobody |
 
 ## Pass vs loose ball
@@ -43,7 +43,7 @@ An uncontrolled stretch (segment) is classified by how it **started**, how the b
 | 3 | `stopped` | game stops before control (offside, foul, injury) |
 | -1 | `none` | not a pass |
 
-A header/touch by an opponent **without control** starts a loose segment; possession stays undecided until someone controls.
+A header/touch by an opponent **without control** starts a loose segment; possession stays with the last team until the opponent gains control.
 
 ## Out of play and restarts
 - Pass ends at the frame the ball crosses the line → ball state `dead`.
@@ -58,14 +58,16 @@ Require **at least 2** of these signals (`dead.min_signals`):
 1. ball out of bounds,
 2. mass deceleration: most tracked players below walking speed (~7 km/h) simultaneously,
 3. ball stationary > 3 s (`dead.stationary_s`),
-4. homography `valid == 0` (camera cut / replay).
+4. ball and player positions match a restart shape.
 
-Never call a short tracking gap "dead" on its own — the ball is often simply off-screen during live play.
+Homography is valid on every tactical frame, so it cannot signal a stoppage.
 
-Offside vs foul cannot be told from tracking; label those by hand from video if needed. Free kick position ≈ receiver's position at the moment of the pass (offside) or foul location.
+Never call a tracking gap "dead" on its own — the ball is often simply undetected during live play.
 
-## Tackles
-An **event**, built on top of possession.
+Offside vs foul cannot be told from tracking, and the label does not need it, since both are `D`. Never label them by hand on this match.
+
+## Tackles (deferred with S6)
+An **event**, built on top of possession. Not part of the scored output.
 - **Candidate:** an opponent of the player in control gets within `tackle.contact_m` (≈1 m) while closing at speed (`tackle.min_closing_kmh`).
 - **Outcome** over the next `tackle.window_s` (1–2 s):
   - `won` — possession flips to the defender's team

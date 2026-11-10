@@ -1,5 +1,7 @@
 # S6 — Events table (incl. tackles)
 
+> **Deferred.** Events are not scored and this stage is not in the build order. Build it only if it raises `spellF1` on other matches. Any labels must come from other matches, never this one.
+
 ## Goal
 Turn segments and states into one tidy events table (schema in `04_data_model.md`).
 

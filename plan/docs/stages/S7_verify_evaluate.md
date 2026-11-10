@@ -1,30 +1,39 @@
 # S7 — Verification and evaluation
 
 ## Goal
-Check results against the video and measure accuracy on a hand-labelled test set; feed findings back into `config.yaml` thresholds.
+Check that the pipeline is correct, tune it without using human labels on this match, and prove the submission can be reproduced.
+
+**No hand labels on this match, for any purpose.** The full-match answers are private, so the final labels cannot be fully validated before submission.
 
 ## Tools to build
-1. **Overlay renderer** (`verify.py`): for a frame range, read video frames (decord/PyAV), project players (team colours), ball and ball state/possession text via H (OpenCV), write MP4 with ffmpeg.
-2. **Event clip cutter:** for any events row → 3 s clip with overlay (1 s before, 2 s after).
-3. **2D pitch animation** with mplsoccer for any segment (useful when the camera cut).
-4. **Labelling:** a simple OpenCV keyboard tagger (or Label Studio/CVAT): play the video, keys for `1` Barcelona control, `2` Athletic control, `f` in flight, `l` loose, `d` dead, `p` pass start, `t` tackle. Store to `data/labels/*.csv` as frame, label.
+1. **Input check script:** the S1 acceptance checks, reporting pass or fail only.
+2. **Repair test:** hide known ball positions and measure how well S1 rebuilds them.
+3. **Other-match evaluator:** run the pipeline on other matches and score with `evaluation/possession_metrics.py`.
+4. **Noise simulator:** degrade clean tracking from other matches to match the noise measured in S1, including bursty ball loss, track fragments and duplicates.
+5. **Debug overlay (optional):** draw tracking and predicted labels on video for local debugging. Never publish the output.
 
-## Test set
-- 10 minutes of open play + one set-piece-heavy period: per-frame ball state & possession.
-- All passes, loose balls and tackles in one half (or 20 min).
+## Tuning
+1. Get tracking with possession labels from other matches. Candidates are the DFL/Sportec open dataset and Metrica's sample data. Check their access terms and possession definitions first.
+2. Degrade that data using the noise simulator.
+3. Tune thresholds and `model.*` values on `spellF1`, starting with the worst failure mode.
+4. Hold out at least one other match to confirm the tuned values generalise.
+5. Log each config change and its effect.
+6. Document every external dataset in the technical document: source, who labelled it and how much.
 
-## Metrics
-- Per-frame ball-state accuracy and confusion matrix; possession-team accuracy (live frames).
-- Events: precision/recall with a ±10-frame matching tolerance, per type.
-- Pass outcome accuracy.
-- Possession % vs labels.
-(scikit-learn metrics, notebook `notebooks/S7_eval.ipynb`, report `reports/S7_eval.md`.)
+## Public 5 minutes
+Run `python evaluation/run_evaluation.py` only to confirm correctness: frames aligned, file well-formed and labels meaning what you think. Never use it to choose between versions or settings.
 
-## Loop
-Tune thresholds for the worst failure mode first (usually aerial balls and crowded boxes), re-run S3–S6, re-evaluate. Log each config change and its metric effect in the report.
+## Final checks
+1. Compare possession counts and durations with expected values for professional football. Do not tune to match the public window.
+2. Run `python evaluation/validate_submission.py <team_name>.csv` on the exact file to upload.
+3. From a clean clone, run the one regenerate command twice and confirm both files have the same SHA-256 hash.
+4. Confirm no match data, clips, frame-level exports or the download link are in the repository or its git history.
 
 ## Acceptance
-- Ball-state accuracy ≥ 90% on live frames, possession-team accuracy ≥ 95%, pass precision/recall ≥ 85% (targets — adjust after first measurement).
+- All input checks pass.
+- `spellF1` on the held-out other match clearly beats 0.2433, with the caveat that it is only an estimate for this match.
+- `validate_submission.py` passes.
+- Two clean runs produce byte-identical files.
 
 ## Edge cases
 Before building, read `docs/06_edge_cases.md` and handle every case whose Stage column includes S7 (or log it as a known limitation in the report).

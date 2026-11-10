@@ -1,17 +1,26 @@
-# Copy to config.yaml and edit paths. All thresholds are starting values to tune in S7.
+# Copy to config.yaml and edit paths. Thresholds are starting values, tuned only on other matches (see S7).
 paths:
-  tracking_txt: data/raw/BAR-ATH_broadcast_atd.txt
-  tracking_xml: data/raw/BAR-ATH_broadcast_atd.xml
-  homography_csv: data/raw/BAR-ATH_broadcast_homography.csv
-  video: /path/to/BAR-ATH_broadcast.mp4      # keep out of git
+  tracking_txt: more-than-a-hack-2027/data/tactical/BAR-ATH_tactical_atd.txt
+  tracking_xml: more-than-a-hack-2027/data/tactical/BAR-ATH_tactical_atd.xml
+  homography_csv: more-than-a-hack-2027/data/tactical/BAR-ATH_tactical_homography.csv
+  smart_tagging_xml: more-than-a-hack-2027/data/tactical/BAR-ATH_tactical_smart_tagging.xml
+  video: null                # optional, keep out of git
   interim: data/interim
-  reports: reports
+  reports: reports           # gitignored, may contain match-derived output
+  submission: submission/team_name.csv
+
+pitch:
+  length_m: 105.3            # games.py value, measured from corrected tracking
+  width_m: 68.0
 
 align:
-  frame_offset: null        # set in S2 (Q3)
-  homography_direction: null  # "pitch_to_image" or "image_to_pitch" (Q4)
-  homography_units: null      # "metres" or "normalised" (Q4)
+  atd_frame_offset: -1       # video_frame = frame_id - 1 (DATA.md)
+  homography_direction: pitch_to_image   # DATA.md
+  homography_units: normalised           # DATA.md
   max_reproj_err: 1.0
+
+units:
+  input_speed: null          # "m_per_s" or "km_per_h", set in S1 (Q12)
 
 control:
   max_dist_m: 1.5
@@ -39,21 +48,27 @@ dead:
   min_signals: 2
   min_s: 1.0
 
-possession:
-  loose_credit: last_team   # or "none"
+clean:
+  max_ball_gap_frames: 5     # interpolate only gaps up to this length
 
-tackle:
-  contact_m: 1.0
-  min_closing_kmh: 5
-  window_s: 1.5
-  merge_s: 0.5
+model:
+  switch_penalty: null       # H<->A penalty, set in S7 on other matches
+  dead_penalty: null         # live<->D penalty, set in S7 on other matches
+  smart_tag_weight: null     # weak evidence, set in S7 on other matches
 
 # Added by docs/06_edge_cases.md
 ball:
   max_kmh: 150
 player:
   max_kmh: 37
-shot:
-  goal_margin_m: 2.0
 touch:
   min_dir_change_deg: 30
+
+# Deferred with S6. Unused by the core pipeline.
+shot:
+  goal_margin_m: 2.0
+tackle:
+  contact_m: 1.0
+  min_closing_kmh: 5
+  window_s: 1.5
+  merge_s: 0.5

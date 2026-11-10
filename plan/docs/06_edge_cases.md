@@ -1,10 +1,12 @@
 # 06 — Edge Cases
 
-Cases already covered in `03_definitions.md`: deflected pass, clearance, second ball after a header, airborne-ball artefacts (no z), short tracking gap ≠ dead ball, offside vs foul not distinguishable, half-time not marked (Q6), frame offset (Q3).
+Cases already covered in `03_definitions.md`: deflected pass, clearance, second ball after a header, airborne-ball artefacts (no z), short tracking gap ≠ dead ball, offside vs foul not distinguishable, half boundaries (Q6) and frame offset (Q3), both settled by `DATA.md`.
 
 Below are 50 more. Each has the **risk** (what goes wrong if ignored), the **handling**, and the **stage** that owns it. For each one, the owning stage must either implement the handling or log it as a known limitation in its report. Add a synthetic test wherever the handling is a rule.
 
-**New event types introduced here** (add to `codes.py` and the events schema): `shot`, `goal`, `save`, `throw_in`, `aerial_duel`, `block`, `touch` (one-touch pass/flick). New ball-state reason: `unknown` (live play not observable).
+**Scope:** cases owned only by S6 are deferred with that stage. Section B applies only if the broadcast feed is used. No case may be handled by hand on this match.
+
+**New event types introduced here** (add to `codes.py` and the events schema only if S6 is built): `shot`, `goal`, `save`, `throw_in`, `aerial_duel`, `block`, `touch` (one-touch pass/flick). New ball-state reason: `unknown` (live play not observable).
 
 ---
 
@@ -22,10 +24,10 @@ Below are 50 more. Each has the **risk** (what goes wrong if ignored), the **han
 | 8 | Off-screen players are NaN, so the true nearest player is invisible | Visible player wrongly credited with control | Require `dmin` < threshold (not just argmin); if ball is near the edge of the camera view (via H) and no one is close, state `unknown` not `loose` | S3 |
 | 9 | Substitutions (new tracks appear, old ones disappear) | Code assuming 11 per team fails | Never assume fixed counts; count active tracks per team per frame | S1 |
 | 10 | Red card: a team plays with 10 | Same as above; pressure features shift | No fixed-count assumptions; report active players per team over time | S1 |
-| 11 | GK replaced or an outfield player goes in goal; XML GK flag (tracks 26/51) wrong for that player | Hand-handling rules (GK holding ball) applied to wrong track | Derive GK role from position (deepest player of team, inside own box most of the time) per period, not only from XML | S1/S2 |
+| 11 | GK replaced or an outfield player goes in goal; XML GK flag wrong for that player | Hand-handling rules (GK holding ball) applied to wrong track | Derive GK role from position (deepest player of team, inside own box most of the time) per period, not only from XML | S1/S2 |
 | 12 | Player speed spikes from tracking jitter | Fake tackles (closing speed) and fake control mismatches | Smooth positions; recompute speed from smoothed positions; cap at `player.max_kmh` (≈ 37) | S1/S3 |
 
-## B. Broadcast / camera
+## B. Broadcast / camera (only if the broadcast feed is used)
 
 | # | Case | Risk | Handling | Stage |
 |---|---|---|---|---|
@@ -40,7 +42,7 @@ Below are 50 more. Each has the **risk** (what goes wrong if ignored), the **han
 
 | # | Case | Risk | Handling | Stage |
 |---|---|---|---|---|
-| 19 | Shielding: attacker and defender equally close to a slow ball | Control flickers between teams | Hysteresis keeps the previous controller; if both within `control.max_dist_m` for long, state `contested` → counted as loose | S3 |
+| 19 | Shielding: attacker and defender equally close to a slow ball | Control flickers between teams | Hysteresis keeps the previous controller; if both within `control.max_dist_m` for long, treat as loose, so possession stays with the last team | S3 |
 | 20 | Dribbler knocks the ball 3–5 m ahead and chases it | Control ends → fake pass/loose segment | Bridge gaps where the same player is the closest player and moving toward the ball at end of the gap (`control.knock_on_m`, ≈ 5 m, ≤ 1 s) | S3 |
 | 21 | Dummy / step-over: ball rolls through a player's legs to a teammate | Dummying player credited with a touch | Proximity shorter than `min_frames` and no speed/direction change → no touch | S3/S4 |
 | 22 | One-touch / first-time passes (control < 6 frames) | Hysteresis merges A→B→C into one pass A→C | Detect touches inside a segment: kick spike or direction change > 30° while a player is within 1 m → split segment, emit `touch` event | S4 |
@@ -48,7 +50,7 @@ Below are 50 more. Each has the **risk** (what goes wrong if ignored), the **han
 | 24 | GK holding the ball in hands (ball speed ~0 for up to 6 s) | Stationary ball → dead ball | Stationary ball with GK of a team within 1 m inside own box → `controlled`, not dead | S5 |
 | 25 | GK punt / drop-kick / throw | Release from hands may show no clean "kick spike" from feet level | Treat release from GK-in-hands control as a pass even with lower kick threshold; throws = short pass | S4 |
 | 26 | Ball off the post or crossbar | Sharp direction change with nobody near → misread as deflection by a player | Direction change at goal frame coordinates (x≈0/105, y≈30.3–37.7) with no player near → segment continues as loose, flag `woodwork` | S4 |
-| 27 | Ball in a crowded box (corners, scrambles) with 4+ players within 2 m | Control flips many times in a second | Raise `min_frames` locally or label `loose` while ≥ `n` players of both teams within 2 m; evaluate separately in S7 | S3/S7 |
+| 27 | Ball in a crowded box (corners, scrambles) with 4+ players within 2 m | Control flips many times in a second | Raise `min_frames` locally or label `loose` while ≥ `n` players of both teams within 2 m; evaluate separately on the other-match data in S7 | S3/S7 |
 | 28 | Advantage played after a foul | Players slow briefly → false dead | Dead requires ball also stationary/out or a cut; mass deceleration alone isn't enough | S5 |
 | 29 | Fair play: ball kicked out for an injury, then returned to the other team | Restart team ≠ "expected" team; long dead stretch | Normal handling (restart decides); flag throw-ins where the thrower's team immediately kicks it to the opponent's GK | S5/S6 |
 
@@ -57,7 +59,7 @@ Below are 50 more. Each has the **risk** (what goes wrong if ignored), the **han
 | # | Case | Risk | Handling | Stage |
 |---|---|---|---|---|
 | 30 | **Shot vs pass**: a shot looks like a fast long pass | Shots counted as failed passes | New `shot` type: kick whose direction line crosses the goal mouth (± margin) within the attacking third; ends at goal line, GK save or block | S4/S6 |
-| 31 | **Goal**: no goal events in the data | Possession/state after a goal wrong; no score | Ball crosses goal line between posts (y 30.34–37.66 m, ~2D) followed by kick-off at centre spot within ~2 min → `goal`; validate against the known 2-1 result | S6 |
+| 31 | **Goal**: no goal events in the data | Possession/state after a goal wrong; no score | Ball crosses goal line between posts (y 30.34–37.66 m, ~2D) followed by kick-off at centre spot within ~2 min → `goal` | S6 |
 | 32 | Ball crosses the goal line *over* the bar (no z) | Counted as a goal | Require the kick-off confirmation for a goal; otherwise it's a goal kick / corner by restart | S6 |
 | 33 | Own goal / deflected shot into own net | Goal credited to wrong team | Credit goal by which goal the ball entered + attack direction, not last touch | S6 |
 | 34 | GK save / catch | Looks like interception | Opponent control by GK inside own box after a shot → `save` | S6 |
@@ -77,11 +79,11 @@ Below are 50 more. Each has the **risk** (what goes wrong if ignored), the **han
 | 43 | Throw-in: ball enters from outside the pitch from the thrower's hands | Starts a segment out of bounds → filtered as noise | Segment starting outside the touchline with a player within 1 m → `throw_in` restart + pass | S4/S6 |
 | 44 | Penalty kick | Treated as normal free kick; positions unusual | Ball stationary on penalty spot (11 m from goal line, centre) with players outside the box → `penalty` restart; following kick = shot | S6 |
 | 45 | Dropped ball after a referee stoppage | Restart team ambiguous | Restart type `dropped_ball`, team = first controller | S6 |
-| 46 | VAR check: long stoppage; a goal may be disallowed | Goal counted although not given | Goal only if confirmed by kick-off (#31); long stoppages flagged for manual check | S6 |
+| 46 | VAR check: long stoppage; a goal may be disallowed | Goal counted although not given | Goal only if confirmed by kick-off (#31) | S6 |
 | 47 | Whistle for half/full time while the ball is in flight | Pass with no end | Segment ends at period end with outcome `stopped` | S5 |
 | 48 | Goal celebration (players run to the corner, ball stationary in net) | Players' high speed → no mass deceleration; ball out of pitch | Ball out of pitch + stationary is enough (2 signals); state dead until kick-off | S5 |
 
-## F. Tackles
+## F. Tackles (deferred with S6)
 
 | # | Case | Risk | Handling | Stage |
 |---|---|---|---|---|
@@ -93,7 +95,7 @@ Additional tackle notes (not counted above, handle with #49/#50 rules): a slide 
 ## G. Coordinates and geometry (checks, also in Q4/Q7)
 
 - Normalised y may run top-down: confirm which goal is at x = 0 and which touchline is y = 0 before any goal/corner logic (#26, #31, #44).
-- The real stadium may not be exactly 105 × 68 m; the data is normalised to 105 × 68, so use that for all line logic.
+- Use the 105.3 × 68.0 m pitch from `games.py` for all line logic, not the 105 × 68 m in the XML metadata.
 - Whole ball must cross the line: use ball radius 0.11 m plus `dead.out_margin_m`; the far touchline has the largest projection error.
 
 ## New config keys

@@ -1,35 +1,34 @@
-# S2 — Align tracking, homography and video; find periods
+# S2 — Periods, graded frames and attack direction
 
 ## Goal
-Make sure tracking frame N, homography row N and video frame N refer to the same moment; build per-frame flags for valid view, camera cuts and match period. Answer Q3–Q7.
+Build the per-frame timeline that later stages use: match period, graded frames and attack direction. Answer Q7. Frame alignment and half boundaries are already settled by `DATA.md`.
 
 ## Input
-S1 outputs, `homography.csv`, the video (path from `config.yaml`).
+S1 outputs and `games.half_video_blocks("BAR-ATH")`. The homography and video are only needed for optional debugging overlays.
 
 ## Output
-- `data/interim/frames.parquet`: `frame, view_ok, reproj_err, camera_cut, period, attack_dir_barca` (+1 = left→right)
-- `data/interim/homography.npz`: `H (T,3,3)` aligned to tracking frames, in the verified direction (pitch metres → image pixels) and its inverse
-- `reports/S2_alignment.md` with overlay images
+- `data/interim/frames.parquet`: `frame, period, graded, attack_dir_barca` (+1 = left→right)
+- `reports/S2_alignment.md`, kept local
 
 ## Steps
-1. `ffprobe` the video: frame count, fps, resolution → Q5.
-2. Load homography CSV; `view_ok = valid == 1`.
-3. **Direction and units (Q4):** for a few valid frames, project pitch corners, centre spot and penalty spots with H and with H⁻¹, in metres and in normalised units; draw them on the video frame. Keep the combination that lands on the pitch markings.
-4. **Offset (Q3):** at 5–10 well-spread frames, project all players and the ball onto the video frame for offsets −2…+2; choose the offset where points sit on players (score by eye or by detecting point-on-shirt). Store the offset in `config.yaml`.
-5. **Camera cuts:** `camera_cut = ~view_ok` plus sudden large changes in H between consecutive frames (replay/scene change).
-6. **Half-time (Q6):** find the long run of invalid view / missing ball in the middle of the file, then the second kick-off: ball within ~1 m of centre spot, ball speed ~0, all players in their own half. Set `period` 1/2 (0 outside play).
-7. **Sides (Q7):** mean x of each GK per period; derive `attack_dir_barca` per period.
+1. Read the graded half blocks from `games.half_video_blocks`. Set `period` to 1 or 2 inside them and 0 elsewhere, and set `graded` to match.
+2. Confirm that the kept frames total 158,857.
+3. **Sides (Q7):** use the mean x of each team's deepest player per period to derive `attack_dir_barca` per period.
+4. Detect the second-half kickoff from the data: ball near the centre spot, low ball speed, players in their own halves. Use the published frame 113,742 only as a check, and store the detected frame for S5.
+5. Optional, only if the video is used: confirm the homography direction (Q4) by drawing pitch markings. Overlays are for local debugging only.
 
 ## Libraries
-OpenCV, decord or PyAV, numpy, polars, ffmpeg/ffprobe.
+numpy, polars. OpenCV only for optional overlays.
 
 ## Tests
-- Synthetic homography: project known points and invert round-trip within 1e-3.
-- Period detector on a synthetic ball path with a gap and a centre-spot restart.
+- Synthetic blocks produce the right `period` and `graded` values.
+- Kickoff detector on a synthetic ball path with a centre-spot restart.
+- Side detector on synthetic team positions that switch ends at halftime.
 
 ## Acceptance
-- Overlay images for ≥ 5 frames (both halves) show players and ball on the right spots.
-- Q3–Q7 answered; offset and H direction stored in config.
+- 158,857 graded frames.
+- Detected second-half kickoff agrees with the published frame within a small tolerance.
+- Q7 answered.
 
 ## Edge cases
 Before building, read `docs/06_edge_cases.md` and handle every case whose Stage column includes S2 (or log it as a known limitation in the report).

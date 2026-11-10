@@ -4,7 +4,7 @@ Two layouts:
 - **Dense per-frame arrays** (one row per frame) for computation — vectorised numpy.
 - **Small per-event tables** (one row per segment/event) for results — polars / structured arrays.
 
-T = 164,488 frames, 51 tracks. **Array index `i` ↔ frame `i + 1`** — keep this mapping in one helper (`frame_to_idx`, `idx_to_frame`).
+T = 199,319 frames, N = 46 slots, read from the XML. **Array index `i` = video frame = submission row, and ATD `frame_id` = `i + 1`** — keep this mapping in one helper (`frame_to_idx`, `idx_to_frame`).
 
 ## Codes (`src/matchan/codes.py`)
 ```python
@@ -17,13 +17,12 @@ TEAM  = {"barcelona": 0, "athletic": 1, "none": -1}
 ## 1. Raw inputs (S1)
 | Name | Shape | dtype | Contents |
 |---|---|---|---|
-| `frame` | (T,) | int32 | frame number 1…164488 |
-| `P` | (T, 51, 3) | float32 | per track x (m), y (m), speed (km/h); NaN if missing (~100 MB) |
+| `frame` | (T,) | int32 | ATD `frame_id` 1…199319 |
+| `P` | (T, N, 3) | float32 | per slot x (m), y (m), speed (km/h after Q12 conversion); NaN if missing |
 | `B` | (T, 3) | float32 | ball x (m), y (m), speed (km/h) |
-| `team` | (51,) | int8 | 0 for tracks 1–26, 1 for 27–51 |
-| `is_gk` | (51,) | bool | True for tracks 26 and 51 |
-| `H` | (T, 3, 3) | float32 | homography per frame (S2) |
-| `view_ok` | (T,) | bool | homography `valid == 1` (S2) |
+| `team` | (N,) | int8 | 0 for home, 1 for away, read from the XML |
+| `is_gk` | (N,) | bool | From the XML if present, otherwise derived from position |
+| `H` | (T, 3, 3) | float32 | homography per frame, only if video is used |
 
 Parquet (long format) for `players.parquet`: `frame, track, team, x, y, speed`.
 
@@ -31,8 +30,8 @@ Parquet (long format) for `players.parquet`: `frame, track, team, x, y, speed`.
 | Name | Shape | dtype | Stage | Contents |
 |---|---|---|---|---|
 | `period` | (T,) | int8 | S2 | 1 / 2 (0 = before kick-off/after end) |
-| `camera_cut` | (T,) | bool | S2 | invalid view or replay |
-| `dist` | (T, 51) | float32 | S3 | ball→track distance (inf if missing) |
+| `graded` | (T,) | bool | S2 | inside a published graded half block |
+| `dist` | (T, N) | float32 | S3 | ball→slot distance (inf if missing) |
 | `nearest` | (T,) | int16 | S3 | nearest track index, −1 if no ball |
 | `dmin` | (T,) | float32 | S3 | distance to nearest |
 | `ball_v` | (T,) | float32 | S3 | smoothed ball speed |
@@ -41,6 +40,7 @@ Parquet (long format) for `players.parquet`: `frame, track, team, x, y, speed`.
 | `ctrl_team` | (T,) | int8 | S3 | team in control, −1 if none |
 | `ball_state` | (T,) | int8 | S5 | STATE code |
 | `poss_team` | (T,) | int8 | S5 | team credited, −1 if dead |
+| `label` | (T,) | str | S5 | final `H`, `A`, `D` or `X` |
 
 Illustrative frames around a long pass:
 ```
@@ -72,7 +72,7 @@ seg_dtype = np.dtype([
 ])
 ```
 
-## 4. Events table (S6)
+## 4. Events table (S6, deferred)
 | Column | Type | Notes |
 |---|---|---|
 | `event_id` | int32 | |
@@ -86,4 +86,4 @@ seg_dtype = np.dtype([
 
 ## Storage
 - numpy for per-frame computation; polars for joins/aggregations.
-- Every stage writes Parquet to `data/interim/` so later stages never re-parse the 142 MB TXT.
+- Every stage writes Parquet to `data/interim/`, which is gitignored, so later stages never re-parse the TXT.
